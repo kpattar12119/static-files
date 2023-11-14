@@ -1,0 +1,115 @@
+/*
+ * Copyright 2019 EPAM Systems
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+buildscript {
+    repositories {
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+    }
+    dependencies {
+        classpath "net.researchgate:gradle-release:2.8.1"
+    }
+}
+
+apply plugin: 'maven'
+apply plugin: 'maven-publish'
+apply plugin: 'java'
+apply plugin: net.researchgate.release.ReleasePlugin
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+    from sourceSets.main.allSource
+    getArchiveClassifier().set('sources')
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    from javadoc.destinationDir
+    getArchiveClassifier().set('javadoc')
+}
+
+javadoc {
+    failOnError = false
+}
+
+artifacts {
+    archives sourcesJar
+    archives javadocJar
+}
+
+def pomConfig = {
+    url "https://github.com/reportportal/${project.name}"
+    packaging 'jar'
+    licenses {
+        license {
+            name "The Apache Software License, Version 2.0"
+            url "http://www.apache.org/licenses/LICENSE-2.0.txt"
+            distribution "repo"
+        }
+    }
+    developers {
+        developer {
+            name 'EPAM Systems'
+            email 'support@reportportal.io'
+            organization 'ReportPortal.io'
+            organizationUrl 'http://www.reportportal.io'
+        }
+    }
+    scm {
+        connection "scm:git:https://github.com/reportportal/${project.name}.git"
+        developerConnection "scm:git:ssh://git@github.com:reportportal/${project.name}.git"
+        url "https://github.com/reportportal/${project.name}/tree/master"
+    }
+}
+
+project.ext.reposiliteUserName = project.hasProperty('reposiliteUserName') ? reposiliteUserName : ""
+project.ext.reposiliteToken = project.hasProperty('reposiliteToken') ? reposiliteToken : ""
+project.ext.publishRepo = project.hasProperty('publishRepo') ? publishRepo : ""
+
+publishing {
+    repositories {
+        maven {
+            name = "reposilite"
+            url = uri(publishRepo)
+            credentials {
+                username = reposiliteUserName
+                password = reposiliteToken
+            }
+        }
+    }
+
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            groupId 'com.altimetrik.tara'
+            artifactId "$project.name"
+
+            pom {
+                name = "${project.name}"
+                description = "${project.description}"
+            }
+
+            pom.withXml {
+                def root = asNode()
+                root.children().last() + pomConfig
+            }
+            artifact sourcesJar
+            artifact javadocJar
+        }
+    }
+
+}
+
+afterReleaseBuild.dependsOn publish
